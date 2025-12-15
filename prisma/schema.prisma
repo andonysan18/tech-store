@@ -1,0 +1,144 @@
+// Archivo: prisma/schema.prisma
+
+// ------------------------------------------------------------------------
+// 1. CONFIGURACIÓN BÁSICA (DataSource y Generator)
+// ------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Usando PostgreSQL como en tu proyecto anterior
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------------
+// 2. DEFINICIÓN DE ENUMS (Tipos Fijos)
+// *Sintaxis corregida para mayor robustez contra errores de validación (un valor por línea).*
+// ------------------------------------------------------------------------
+
+enum Role {
+  CLIENT
+  ADMIN
+  TECNICO
+}
+
+enum ProductCondition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+enum RepairStatus {
+  PENDIENTE
+  EN_DIAGNOSTICO
+  ESPERANDO_REPUESTO
+  EN_REPARACION
+  LISTO
+  ENTREGADO
+  CANCELADO
+}
+
+enum OrderStatus {
+  PENDIENTE_PAGO
+  PAGADO
+  ENVIADO
+  ENTREGADO
+  CANCELADO
+}
+
+// ------------------------------------------------------------------------
+// 3. DEFINICIÓN DE MODELOS (Estructura de la Base de Datos)
+// ------------------------------------------------------------------------
+
+// --- USUARIOS ---
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  password      String
+  name          String?
+  role          Role           @default(CLIENT) // Usa el Enum Role
+  createdAt     DateTime       @default(now())
+  
+  orders        Order[]
+  repairs       RepairTicket[]
+}
+
+// --- CATALOGO ---
+model Brand {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique
+  imageUrl  String?   
+  products  Product[]
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  slug      String    @unique 
+  imageUrl  String?
+  products  Product[]
+}
+
+model Product {
+  id            Int              @id @default(autoincrement())
+  name          String           
+  description   String?
+  price         Decimal          @db.Decimal(10, 2)
+  stock         Int              @default(0)
+  
+  // 🔥 IMÁGENES Y ESPECIFICACIONES
+  images        String[]         // Array para galería
+  specs         Json?            // { "ram": "8gb", "screen": "oled" }
+
+  // Relaciones
+  categoryId    Int
+  category      Category         @relation(fields: [categoryId], references: [id])
+  brandId       Int
+  brand         Brand            @relation(fields: [brandId], references: [id])
+
+  condition     ProductCondition @default(NEW) // Usa el Enum ProductCondition
+  isFeatured    Boolean          @default(false)
+  discount      Int              @default(0)
+  
+  orderItems    OrderItem[]
+  createdAt     DateTime         @default(now())
+}
+
+// --- VENTAS Y SERVICIOS ---
+model Order {
+  id        Int         @id @default(autoincrement())
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PAGADO) // Usa el Enum OrderStatus
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  orderId   Int
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model RepairTicket {
+  id                 String       @id @default(uuid())
+  trackingCode       String       @unique @default(cuid())
+  deviceModel        String
+  issueDescription   String
+  status             RepairStatus @default(PENDIENTE) // Usa el Enum RepairStatus
+  estimatedCost      Decimal?     @db.Decimal(10, 2)
+  contactPhone       String?      
+  internalNotes      String?      
+  userId             Int?
+  user               User?        @relation(fields: [userId], references: [id])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
