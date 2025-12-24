@@ -1,7 +1,7 @@
 // Archivo: prisma/schema.prisma
 
 // ------------------------------------------------------------------------
-// 1. CONFIGURACIÓN BÁSICA (DataSource y Generator)
+// 1. CONFIGURACIÓN BÁSICA
 // ------------------------------------------------------------------------
 
 generator client {
@@ -9,13 +9,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // Usando PostgreSQL como en tu proyecto anterior
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // ------------------------------------------------------------------------
-// 2. DEFINICIÓN DE ENUMS (Tipos Fijos)
-// *Sintaxis corregida para mayor robustez contra errores de validación (un valor por línea).*
+// 2. ENUMS (Estados y Tipos)
 // ------------------------------------------------------------------------
 
 enum Role {
@@ -49,23 +48,46 @@ enum OrderStatus {
 }
 
 // ------------------------------------------------------------------------
-// 3. DEFINICIÓN DE MODELOS (Estructura de la Base de Datos)
+// 3. MODELOS
 // ------------------------------------------------------------------------
 
-// --- USUARIOS ---
+// --- USUARIOS Y PERFIL ---
+
 model User {
-  id            Int            @id @default(autoincrement())
-  email         String         @unique
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
   password      String
   name          String?
-  role          Role           @default(CLIENT) // Usa el Enum Role
-  createdAt     DateTime       @default(now())
+  role          Role      @default(CLIENT)
+  phone         String?   // Útil para contacto rápido en reparaciones
   
+  // Relaciones
+  addresses     Address[]
   orders        Order[]
   repairs       RepairTicket[]
+  reviews       Review[]
+  cart          Cart?     // Un usuario tiene un carrito activo
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
-// --- CATALOGO ---
+// Direcciones guardadas en el perfil del usuario
+model Address {
+  id          Int     @id @default(autoincrement())
+  street      String
+  city        String
+  state       String
+  zipCode     String
+  country     String
+  isDefault   Boolean @default(false)
+  
+  userId      Int
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+// --- CATALOGO DE PRODUCTOS ---
+
 model Brand {
   id        Int       @id @default(autoincrement())
   name      String    @unique
@@ -79,66 +101,165 @@ model Category {
   name      String    @unique
   slug      String    @unique 
   imageUrl  String?
+
+  // Relación recursiva para Subcategorías (Ej: Computación -> Laptops)
+  parentId  Int?
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+
   products  Product[]
 }
 
+// El "Padre" del producto (Ej: "iPhone 13")
+// Contiene la info general que comparten todas las variantes
 model Product {
-  id            Int              @id @default(autoincrement())
-  name          String           
-  description   String?
-  price         Decimal          @db.Decimal(10, 2)
-  stock         Int              @default(0)
+  id          Int      @id @default(autoincrement())
+  name        String
+  slug        String   @unique             
+  description String?
   
-  // 🔥 IMÁGENES Y ESPECIFICACIONES
-  images        String[]         // Array para galería
-  specs         Json?            // { "ram": "8gb", "screen": "oled" }
-
+  // Especificaciones técnicas generales (JSON)
+  // Ej: { "screen": "6.1 OLED", "camera": "12MP" }
+  specs       Json?    
+  
   // Relaciones
-  categoryId    Int
-  category      Category         @relation(fields: [categoryId], references: [id])
-  brandId       Int
-  brand         Brand            @relation(fields: [brandId], references: [id])
+  categoryId  Int
+  category    Category @relation(fields: [categoryId], references: [id])
+  brandId     Int
+  brand       Brand    @relation(fields: [brandId], references: [id])
 
-  condition     ProductCondition @default(NEW) // Usa el Enum ProductCondition
-  isFeatured    Boolean          @default(false)
-  discount      Int              @default(0)
-  
-  orderItems    OrderItem[]
-  createdAt     DateTime         @default(now())
+  variants    ProductVariant[]
+  reviews     Review[]
+
+  isFeatured  Boolean  @default(false)
+  discount    Int      @default(0) // Porcentaje de descuento (ej: 15 para 15%)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-// --- VENTAS Y SERVICIOS ---
-model Order {
-  id        Int         @id @default(autoincrement())
-  total     Decimal     @db.Decimal(10, 2)
-  status    OrderStatus @default(PAGADO) // Usa el Enum OrderStatus
+// La "Variante" física (Ej: "iPhone 13 - Azul - 128GB - Nuevo")
+// Aquí es donde manejamos el stock y precio real
+model ProductVariant {
+  id          Int              @id @default(autoincrement())
+  sku         String           @unique // Código único de inventario
+  price       Decimal          @db.Decimal(10, 2)
+  stock       Int              @default(0)
+  
+  // Atributos específicos
+  color       String?          // Ej: "Midnight Blue"
+  storage     String?          // Ej: "128GB", "1TB"
+  condition   ProductCondition @default(NEW)
+  
+  // Imágenes específicas de esta variante (ej: foto del celular azul)
+  images      String[]         
+
+  productId   Int
+  product     Product          @relation(fields: [productId], references: [id])
+  
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+}
+
+// Sistema de Reseñas
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      @default(5) // 1 a 5 estrellas
+  comment   String?
+  
   userId    Int
-  user      User        @relation(fields: [userId], references: [id])
-  items     OrderItem[]
-  createdAt DateTime    @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// --- CARRITO DE COMPRAS (Opcional pero recomendado) ---
+
+model Cart {
+  id        Int        @id @default(autoincrement())
+  userId    Int        @unique
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        Int            @id @default(autoincrement())
+  quantity  Int
+  cartId    Int
+  cart      Cart           @relation(fields: [cartId], references: [id])
+  
+  variantId Int
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+}
+
+// --- VENTAS Y PEDIDOS ---
+
+model Order {
+  id            Int         @id @default(autoincrement())
+  total         Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDIENTE_PAGO)
+  
+  userId        Int
+  user          User        @relation(fields: [userId], references: [id])
+  
+  items         OrderItem[]
+  
+  // Información de envío CONGELADA (Snapshot)
+  // No relacionamos a Address ID, copiamos los datos por si el usuario borra la dirección después
+  shippingAddress Json      // { "street": "...", "city": "...", "zip": "..." }
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model OrderItem {
-  id        Int     @id @default(autoincrement())
-  quantity  Int
-  price     Decimal @db.Decimal(10, 2)
-  orderId   Int
-  order     Order   @relation(fields: [orderId], references: [id])
-  productId Int
-  product   Product @relation(fields: [productId], references: [id])
+  id          Int            @id @default(autoincrement())
+  quantity    Int
+  price       Decimal        @db.Decimal(10, 2) // Precio al momento de la compra
+  
+  orderId     Int
+  order       Order          @relation(fields: [orderId], references: [id])
+  
+  variantId   Int
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
 }
 
+// --- SISTEMA DE REPARACIONES (SAT) ---
+
 model RepairTicket {
-  id                 String       @id @default(uuid())
-  trackingCode       String       @unique @default(cuid())
-  deviceModel        String
-  issueDescription   String
-  status             RepairStatus @default(PENDIENTE) // Usa el Enum RepairStatus
-  estimatedCost      Decimal?     @db.Decimal(10, 2)
-  contactPhone       String?      
-  internalNotes      String?      
-  userId             Int?
-  user               User?        @relation(fields: [userId], references: [id])
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  id               String       @id @default(uuid())
+  trackingCode     String       @unique @default(cuid()) // Código corto para que el cliente consulte
+  
+  deviceModel      String       // Ej: "PlayStation 5", "iPhone X"
+  serialNumber     String?      // Importante para no confundir dispositivos iguales
+  issueDescription String
+  
+  status           RepairStatus @default(PENDIENTE)
+  
+  estimatedCost    Decimal?     @db.Decimal(10, 2)
+  finalCost        Decimal?     @db.Decimal(10, 2)
+  
+  contactPhone     String?      
+  internalNotes    String?      // Notas solo para técnicos
+  
+  userId           Int?
+  user             User?        @relation(fields: [userId], references: [id])
+  
+  logs             RepairLog[]  // Historial de cambios de estado
+  
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+// Historial de la reparación (Trazabilidad)
+model RepairLog {
+  id              Int          @id @default(autoincrement())
+  ticketId        String
+  ticket          RepairTicket @relation(fields: [ticketId], references: [id])
+  
+  status          RepairStatus // El estado al que cambió
+  note            String?      // Ej: "Se pidió el repuesto a proveedor X"
+  createdAt       DateTime     @default(now())
 }

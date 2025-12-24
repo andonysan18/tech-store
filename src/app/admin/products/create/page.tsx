@@ -1,30 +1,16 @@
-import { prisma } from "@/src/lib/db";
-import { CreateProductForm } from "@/src/components/products/product-form"; // Importamos el componente nuevo
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
+import { ProductForm } from "@/src/components/admin/products/ProductForm"
+import { prisma } from "@/src/lib/db"
 
 export default async function CreateProductPage() {
-  // Buscamos datos en el servidor
-  const categories = await prisma.category.findMany();
-  const brands = await prisma.brand.findMany();
+  // Buscamos datos necesarios para el formulario
+  const [categories, brands] = await Promise.all([
+    prisma.category.findMany({ orderBy: { name: 'asc' } }),
+    prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+  ])
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Nuevo Producto</CardTitle>
-          <CardDescription>Agrega un nuevo ítem a tu inventario.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Renderizamos el componente cliente pasándole los datos */}
-          <CreateProductForm categories={categories} brands={brands} />
-        </CardContent>
-      </Card>
+    <div className="max-w-5xl mx-auto pb-10">
+      <ProductForm categories={categories} brands={brands} />
     </div>
-  );
+  )
 }
