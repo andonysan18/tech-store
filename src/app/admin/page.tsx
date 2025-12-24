@@ -1,82 +1,73 @@
-import { getDashboardStats, getGraphRevenue, getRecentOrders } from "@/src/actions/admin/get-dashboard-stats";
-import { SalesChart } from "@/src/components/admin/dashboard/SalesChart";
-import { DollarSign, ShoppingBag, Wrench, AlertTriangle, User } from "lucide-react";
+import { prisma } from "@/src/lib/db";
+import { DollarSign, ShoppingCart, Wrench, Users } from "lucide-react";
 
-// --- Subcomponente Rápido para KPIs (Mismo de antes) ---
-function StatCard({ title, value, icon: Icon, color }: any) {
-  return (
-    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <h3 className="text-2xl font-bold mt-1 text-gray-900">{value}</h3>
-      </div>
-      <div className={`p-3 rounded-full ${color} bg-opacity-10`}> {/* Agregué opacidad para mejor look */}
-        <Icon className={`w-6 h-6 ${color.replace('bg-', 'text-')}`} />
-      </div>
-    </div>
-  );
-}
-
-export default async function AdminDashboardPage() {
-  // 1. Obtenemos TODOS los datos en paralelo
-  const [stats, graphData, recentOrders] = await Promise.all([
-    getDashboardStats(),
-    getGraphRevenue(),
-    getRecentOrders()
+export default async function AdminDashboard() {
+  // Consultas en paralelo para llenar las tarjetas
+  const [ordersCount, repairsCount, productsCount, totalRevenue] = await Promise.all([
+    prisma.order.count(),
+    prisma.repairTicket.count({ where: { status: { not: "ENTREGADO" } } }), // Solo activas
+    prisma.productVariant.aggregate({ _sum: { stock: true } }),
+    prisma.order.aggregate({ _sum: { total: true } }) // Total vendido histórico
   ]);
 
   return (
-    <div className="space-y-8 pb-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
-        <p className="text-gray-500 mt-2">Visión general de tu tienda tech.</p>
-      </div>
-
-      {/* 1. KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Ingresos Totales" value={`$${stats.revenue.toLocaleString()}`} icon={DollarSign} color="bg-green-500" />
-        <StatCard title="Ventas Totales" value={stats.salesCount} icon={ShoppingBag} color="bg-blue-500" />
-        <StatCard title="Reparaciones Activas" value={stats.activeRepairs} icon={Wrench} color="bg-orange-500" />
-        <StatCard title="Stock Bajo" value={stats.lowStockProducts} icon={AlertTriangle} color="bg-red-500" />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+    <div>
+      <h2 className="text-3xl font-bold text-slate-800 mb-8">Panel de Control</h2>
+      
+      {/* TARJETAS DE RESUMEN */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
-        {/* 2. Gráfico de Ventas (Ocupa 4 columnas) */}
-        <div className="col-span-4 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ingresos por Mes</h3>
-          <div className="h-[350px]">
-            <SalesChart data={graphData} />
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
+              <ShoppingCart size={24} />
+            </div>
+            <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">+12%</span>
           </div>
+          <p className="text-slate-500 text-sm">Pedidos Totales</p>
+          <h3 className="text-2xl font-bold text-slate-900">{ordersCount}</h3>
         </div>
 
-        {/* 3. Últimas Ventas (Ocupa 3 columnas) */}
-        <div className="col-span-3 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ventas Recientes</h3>
-          <div className="space-y-6">
-            {recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center">
-                    <User className="w-5 h-5 text-gray-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{order.user.name || "Cliente"}</p>
-                    <p className="text-xs text-gray-500">{order.user.email}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">+${Number(order.total).toLocaleString()}</p>
-                  <p className="text-xs text-gray-500 capitalize">{order.status.toLowerCase().replace('_', ' ')}</p>
-                </div>
-              </div>
-            ))}
-            {recentOrders.length === 0 && (
-              <p className="text-gray-500 text-sm">No hay ventas recientes.</p>
-            )}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-green-100 text-green-600 rounded-lg">
+              <DollarSign size={24} />
+            </div>
           </div>
+          <p className="text-slate-500 text-sm">Ingresos Totales</p>
+          <h3 className="text-2xl font-bold text-slate-900">
+            ${Number(totalRevenue._sum.total || 0).toLocaleString("es-AR")}
+          </h3>
         </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
+              <Wrench size={24} />
+            </div>
+            <span className="text-xs font-bold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">Activos</span>
+          </div>
+          <p className="text-slate-500 text-sm">Reparaciones en Curso</p>
+          <h3 className="text-2xl font-bold text-slate-900">{repairsCount}</h3>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
+              <Users size={24} />
+            </div>
+          </div>
+          <p className="text-slate-500 text-sm">Stock Total (Unidades)</p>
+          <h3 className="text-2xl font-bold text-slate-900">{productsCount._sum.stock || 0}</h3>
+        </div>
+
       </div>
+
+      {/* AQUÍ PONDREMOS UNA TABLA DE ÚLTIMOS PEDIDOS DESPUÉS */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-center h-64">
+        <p className="text-slate-400">Gráficos de ventas próximamente...</p>
+      </div>
+
     </div>
   );
 }

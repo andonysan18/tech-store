@@ -18,19 +18,18 @@ import { Badge } from "@/src/components/ui/badge";
 
 export function Navbar() {
   const pathname = usePathname();
-  const [isPromoOpen, setIsPromoOpen] = useState(true);
+  const router = useRouter();
   
-  // Estado de montaje para evitar errores de hidratación
+  // Estados
+  const [isPromoOpen, setIsPromoOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [query, setQuery] = useState("");
+  const [isSheetOpen, setIsSheetOpen] = useState(false); // 🔥 Nuevo estado para controlar el menú móvil
 
   // Stores
   const totalItems = useCartStore((state) => state.getTotalItems());
   const favoriteItems = useFavoritesStore((state) => state.items);
   const totalFavorites = favoriteItems.length;
-  
-  // Buscador
-  const router = useRouter();
-  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -40,11 +39,11 @@ export function Navbar() {
     e.preventDefault(); 
     if (query.trim()) {
         router.push(`/search?q=${encodeURIComponent(query)}`);
+        setIsSheetOpen(false); // Cerramos menú si buscamos desde móvil
     }
   };
 
-  // Lógica Admin: Si estamos en admin, retornamos null AHORA (evita renderizar nada)
-  // Nota: Esto es seguro siempre y cuando el layout de admin no espere este navbar.
+  // Ocultar navbar en admin
   if (pathname && pathname.startsWith('/admin')) {
     return null;
   }
@@ -82,7 +81,7 @@ export function Navbar() {
           <Input 
             type="text" 
             placeholder="Buscar iPhone, fundas, cargadores..." 
-            className="w-full bg-gray-100 border-transparent focus:bg-white rounded-full py-5 pl-5 pr-12 text-sm shadow-none"
+            className="w-full bg-gray-100 border-transparent focus:bg-white rounded-full py-5 pl-5 pr-12 text-sm shadow-none focus-visible:ring-blue-600"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -105,10 +104,9 @@ export function Navbar() {
             <span className="text-[10px] font-medium mt-0.5">Favoritos</span>
           </Link>
           
-          {/* --- CORRECCIÓN CLAVE AQUÍ --- */}
-          {/* Si no está montado, mostramos solo el ícono estático para evitar error de ID Radix */}
+          {/* Cuenta / Dropdown */}
           {!mounted ? (
-             <div className="flex flex-col items-center opacity-70">
+             <div className="flex flex-col items-center opacity-70 cursor-wait">
                 <User size={24} />
                 <span className="text-[10px] font-medium mt-0.5">Cuenta</span>
              </div>
@@ -144,15 +142,15 @@ export function Navbar() {
             <span className="text-[10px] font-medium mt-0.5">Carrito</span>
           </Link>
 
-          {/* --- CORRECCIÓN CLAVE EN MENÚ MÓVIL --- */}
+          {/* MENÚ MÓVIL OPTIMIZADO */}
           {!mounted ? (
              <button className="md:hidden ml-2 text-slate-800">
                 <Menu size={28} />
              </button>
           ) : (
-             <Sheet>
+             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                <SheetTrigger asChild>
-                 <button className="md:hidden ml-2 text-slate-800">
+                 <button className="md:hidden ml-2 text-slate-800 hover:text-blue-600 transition">
                    <Menu size={28} />
                  </button>
                </SheetTrigger>
@@ -165,26 +163,30 @@ export function Navbar() {
                  </SheetHeader>
                  
                  <div className="flex flex-col gap-4 mt-6">
-                   <form onSubmit={handleSearch}>
+                   <form onSubmit={handleSearch} className="relative">
                        <Input 
                            placeholder="Buscar productos..." 
-                           className="bg-slate-100" 
+                           className="bg-slate-100 pr-10" 
                            value={query}
                            onChange={(e) => setQuery(e.target.value)}
                        />
+                       <button type="submit" className="absolute right-2 top-2.5 text-slate-400">
+                           <Search size={18} />
+                       </button>
                    </form>
                    
                    <nav className="flex flex-col gap-2">
-                       <Link href="/category/celulares" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
+                       {/* 🔥 Agregamos onClick={() => setIsSheetOpen(false)} para cerrar el menú al clickear */}
+                       <Link onClick={() => setIsSheetOpen(false)} href="/category/celulares" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
                            <Smartphone size={20} className="text-blue-500"/> Celulares
                        </Link>
-                       <Link href="/category/consolas" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
+                       <Link onClick={() => setIsSheetOpen(false)} href="/category/consolas" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
                            <Gamepad2 size={20} className="text-purple-500"/> Gaming
                        </Link>
-                       <Link href="/category/accesorios" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
-                           <Headphones size={20} className="text-green-500"/> Accesorios
+                       <Link onClick={() => setIsSheetOpen(false)} href="/category/audio" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
+                           <Headphones size={20} className="text-green-500"/> Audio
                        </Link>
-                       <Link href="/favorites" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
+                       <Link onClick={() => setIsSheetOpen(false)} href="/favorites" className="flex items-center gap-3 p-3 hover:bg-slate-100 rounded-lg text-lg font-medium">
                            <div className="relative">
                                <Heart size={20} className="text-red-500"/>
                                {mounted && totalFavorites > 0 && (
@@ -193,7 +195,7 @@ export function Navbar() {
                            </div>
                            Mis Favoritos
                        </Link>
-                       <Link href="/seguimiento" className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-lg text-lg font-medium mt-2">
+                       <Link onClick={() => setIsSheetOpen(false)} href="/reparaciones" className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-lg text-lg font-medium mt-2">
                            <Wrench size={20}/> Reparaciones
                        </Link>
                    </nav>
@@ -205,16 +207,16 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* 3. MENÚ DE CATEGORÍAS */}
-      <div className="border-t border-gray-100 hidden md:block">
+      {/* 3. MENÚ DE CATEGORÍAS (Desktop) */}
+      <div className="border-t border-gray-100 hidden md:block bg-white/50 backdrop-blur-sm">
         <div className="container mx-auto px-4">
           <ul className="flex items-center gap-8 text-sm font-medium text-slate-600 h-12">
             <li><Link href="/category/celulares" className="flex items-center gap-2 hover:text-blue-600 transition"><Smartphone size={18} /> Celulares</Link></li>
             <li><Link href="/category/consolas" className="flex items-center gap-2 hover:text-blue-600 transition"><Gamepad2 size={18} /> Gaming & Consolas</Link></li>
             <li><Link href="/category/audio" className="flex items-center gap-2 hover:text-blue-600 transition"><Headphones size={18} /> Audio</Link></li>
             <li className="flex-1"></li>
-            <li><Link href="/offers" className="text-red-500 hover:text-red-600 flex items-center gap-1 font-semibold"><Zap size={16} fill="currentColor" /> Ofertas Flash</Link></li>
-            <li><Link href="/seguimiento" className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"><Wrench size={16} /> Estado de Reparación</Link></li>
+            <li><Link href="/offers" className="text-red-500 hover:text-red-600 flex items-center gap-1 font-semibold animate-pulse"><Zap size={16} fill="currentColor" /> Ofertas Flash</Link></li>
+            <li><Link href="/repair/tracking" className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"><Wrench size={16} /> Estado de Reparación</Link></li>
           </ul>
         </div>
       </div>

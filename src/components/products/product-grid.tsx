@@ -4,20 +4,18 @@ import { useState } from "react";
 import { ProductCard } from "@/src/components/products/product-card"; 
 
 interface ProductGridProps {
-  products: any[]; // Recibe el array formateado desde page.tsx
+  products: any[]; 
 }
 
 export function ProductGrid({ products }: ProductGridProps) {
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
 
-  // 1. Extracción segura de marcas
   const brands = Array.from(new Set(
     products
       .map((p) => p.brand?.name)
       .filter((name) => name !== undefined && name !== null)
   ));
 
-  // 2. Filtramos los productos
   const filteredProducts = selectedBrand
     ? products.filter((p) => p.brand?.name === selectedBrand)
     : products;
@@ -25,11 +23,10 @@ export function ProductGrid({ products }: ProductGridProps) {
   return (
     <div className="flex flex-col gap-8">
       
-      {/* BARRA DE FILTROS */}
+      {/* BARRA DE FILTROS (Sin cambios) */}
       {brands.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-slate-500 mr-2">Filtrar por:</span>
-            
             <button
                 onClick={() => setSelectedBrand(null)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all border ${
@@ -40,7 +37,6 @@ export function ProductGrid({ products }: ProductGridProps) {
             >
                 Todos
             </button>
-
             {brands.map((brand) => (
                 <button
                     key={brand as string}
@@ -54,8 +50,7 @@ export function ProductGrid({ products }: ProductGridProps) {
                     {brand as string}
                 </button>
             ))}
-            
-            {selectedBrand && (
+             {selectedBrand && (
                 <span className="ml-auto text-xs text-slate-400 animate-in fade-in">
                     Viendo {filteredProducts.length} resultados
                 </span>
@@ -71,15 +66,18 @@ export function ProductGrid({ products }: ProductGridProps) {
               key={product.id}
               product={{
                 id: product.id,
-                variantId: product.variantId, // <--- 🔥 PASAMOS EL ID DE VARIANTE
+                variantId: product.variantId,
                 name: product.name,
                 slug: product.slug, 
-                price: product.price, // Ya viene como number
+                price: product.price,
                 image: product.image,
                 stock: product.stock,
                 condition: product.condition,
                 category: product.category,
-                specs: product.specs 
+                specs: product.specs,
+                
+                // 🔥 ESTA LÍNEA FALTABA: Pasamos el descuento al componente hijo
+                discount: product.discount 
               }}
             />
           ))}

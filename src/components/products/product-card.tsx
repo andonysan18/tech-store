@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AddToCart } from "./add-to-cart";
 import { Badge } from "@/src/components/ui/badge";
-import { Heart, Cpu, Smartphone, Monitor } from "lucide-react";
+import { Heart, Cpu, Monitor, Tag } from "lucide-react"; // 🔥 Agregué el icono Tag
 import { useFavoritesStore } from "@/src/store/favorites-store";
 
 interface ProductCardProps {
@@ -19,8 +19,8 @@ interface ProductCardProps {
     stock: number;
     category: string;
     condition: string;
-    // 🔥 Agregamos brand opcional aquí
     brand?: { name: string }; 
+    discount?: number; // 🔥 Definimos que puede recibir descuento
     specs?: { ram?: string; screen?: string };
   };
 }
@@ -32,6 +32,14 @@ export function ProductCard({ product }: ProductCardProps) {
 
   useEffect(() => setMounted(true), []);
 
+  // 🧮 1. LÓGICA DEL PRECIO
+  const hasDiscount = product.discount && product.discount > 0;
+  
+  // Si hay descuento, restamos el porcentaje. Si no, queda el precio original.
+  const finalPrice = hasDiscount 
+    ? product.price * (1 - (product.discount! / 100)) 
+    : product.price;
+
   const toggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -39,22 +47,14 @@ export function ProductCard({ product }: ProductCardProps) {
       removeFavorite(product.id);
     } else {
       addFavorite({
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        category: product.category,
-        stock: product.stock,
-        condition: product.condition,
-        // 🔥 Guardamos la marca para que el filtro funcione en FavoritesPage
-        brand: product.brand 
+        ...product,
+        price: finalPrice // Guardamos el precio real (con descuento) en favoritos
       });
     }
   };
 
-  // Validación de imagen
   const imageSrc = product.image && product.image !== "placeholder"
-    ? (product.image.startsWith("http") ? product.image : `/${product.image.startsWith("/") ? product.image.slice(1) : product.image}`)
+    ? (product.image.startsWith("http") ? product.image : `/${product.image.replace(/^\//, '')}`)
     : "/placeholder.png"; 
 
   return (
@@ -74,14 +74,22 @@ export function ProductCard({ product }: ProductCardProps) {
         )}
 
         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10 items-start">
-          {product.condition === "NEW" && (
-            <Badge className="bg-blue-600 hover:bg-blue-700 text-[10px] px-2 py-0.5 h-auto font-semibold shadow-sm">NUEVO</Badge>
+          
+          {/* 🔥 2. BADGE DE DESCUENTO */}
+          {hasDiscount && (
+             <Badge className="bg-red-500 hover:bg-red-600 text-white text-[10px] px-2 py-0.5 h-auto font-bold shadow-sm flex items-center gap-1 animate-pulse">
+                <Tag size={10} /> {product.discount}% OFF
+             </Badge>
           )}
-          {product.stock === 0 && (
-            <Badge variant="destructive" className="text-[10px] px-2 py-0.5 h-auto shadow-sm">AGOTADO</Badge>
+
+          {product.condition === "NEW" && !hasDiscount && (
+            <Badge className="bg-blue-600 hover:bg-blue-700 text-[10px] px-2 py-0.5 h-auto font-semibold shadow-sm">NUEVO</Badge>
           )}
           {product.condition === "REFURBISHED" && (
             <Badge className="bg-amber-500 hover:bg-amber-600 text-[10px] px-2 py-0.5 h-auto shadow-sm">REACONDICIONADO</Badge>
+          )}
+          {product.stock === 0 && (
+            <Badge variant="destructive" className="text-[10px] px-2 py-0.5 h-auto shadow-sm">AGOTADO</Badge>
           )}
         </div>
 
@@ -122,25 +130,32 @@ export function ProductCard({ product }: ProductCardProps) {
            )}
         </div>
 
-        {/* BOTTOM: PRECIO Y CART */}
+        {/* BOTTOM: PRECIO */}
         <div className="mt-auto pt-3 border-t border-slate-50 flex items-center justify-between gap-2">
           <div className="flex flex-col">
-            {product.condition !== "NEW" && (
+            
+            {/* 🔥 3. MOSTRAR PRECIOS TACHADOS O NORMALES */}
+            {hasDiscount ? (
+               <>
                  <span className="text-[10px] text-slate-400 line-through">
-                   ${(product.price * 1.1).toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                   ${product.price.toLocaleString("es-AR")}
                  </span>
+                 <span className="text-lg font-bold text-red-600 tracking-tight">
+                   ${finalPrice.toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                 </span>
+               </>
+            ) : (
+                <span className="text-lg font-bold text-slate-900 tracking-tight">
+                  ${product.price.toLocaleString("es-AR")}
+                </span>
             )}
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
-              ${product.price.toLocaleString("es-AR")}
-            </span>
           </div>
 
           <div className="shrink-0">
-             {/* 🔥 AQUÍ USAMOS variantId PARA EL CARRITO */}
              <AddToCart product={{
-                 id: product.variantId || product.id, // Preferimos variantId, fallback a id
+                 id: product.variantId || product.id,
                  name: product.name,
-                 price: product.price,
+                 price: finalPrice, // 🔥 Enviamos el precio CON DESCUENTO al carrito
                  image: imageSrc,
                  stock: product.stock
              }} /> 

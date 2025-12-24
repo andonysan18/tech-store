@@ -2,78 +2,120 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useCartStore } from "@/src/store/cart-store";
+import { useSearchParams } from "next/navigation"; 
+import { CheckCircle2, MessageCircle, Copy, MapPin, Store, Wallet } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
-import { Check, Printer, ArrowRight, ShoppingBag } from "lucide-react";
-// import { Confetti } from "@/src/components/ui/confetti"; // (Opcional, si tuviéramos confetti, pero usaremos CSS simple)
+import { useCartStore } from "@/src/store/cart-store";
+import { toast } from "sonner";
 
 export default function SuccessPage() {
+  const searchParams = useSearchParams();
+  
+  // 1. LEEMOS EL ID REAL Y EL TIPO DE PAGO DE LA URL
+  const type = searchParams.get("type"); 
+  const orderIdFromUrl = searchParams.get("orderId"); // <--- AQUÍ ESTÁ EL ID REAL DE LA DB
+
   const clearCart = useCartStore((state) => state.clearCart);
-  const [orderId, setOrderId] = useState("");
-
+  
+  // 2. Vaciamos el carrito apenas carga
   useEffect(() => {
-    // 1. Generamos un ID de orden falso para simular
-    const randomId = Math.floor(100000 + Math.random() * 900000).toString();
-    setOrderId(randomId);
-
-    // 2. 🔥 VACIAR EL CARRITO AUTOMÁTICAMENTE
-    // Es importante hacerlo aquí para que el usuario empiece de cero
     clearCart();
   }, [clearCart]);
 
-  return (
-    <div className="bg-gray-50 min-h-screen flex items-center justify-center p-4">
-      <div className="bg-white max-w-md w-full rounded-3xl shadow-xl border border-gray-100 p-8 text-center relative overflow-hidden">
-        
-        {/* Decoración de fondo */}
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+  const isTransfer = type === "transfer";
+  const phone = "5491162198405"; 
+  
+  // 3. Usamos el ID real en el mensaje. Si no viene, ponemos "Pendiente".
+  const displayId = orderIdFromUrl ? `#${orderIdFromUrl}` : "N/A";
 
-        {/* Icono de Éxito Animado */}
-        <div className="mb-6 flex justify-center">
-            <div className="h-24 w-24 bg-green-100 rounded-full flex items-center justify-center shadow-inner animate-in zoom-in duration-500">
-                <Check size={48} className="text-green-600 drop-shadow-sm" strokeWidth={3} />
+  const message = isTransfer
+    ? `Hola TechStore! 👋 Hice el pedido ${displayId}. Adjunto el comprobante de transferencia.`
+    : `Hola TechStore! 👋 Hice el pedido ${displayId}. Paso a retirar y pagar en el local.`;
+
+  const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copiado");
+  };
+
+  return (
+    <div className="min-h-[80vh] flex flex-col items-center justify-center bg-gray-50 px-4 py-12 text-center">
+      
+      <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl border border-slate-100 max-w-lg w-full animate-in zoom-in duration-500">
+        
+        <div className="flex justify-center mb-6">
+            <div className="bg-green-100 p-4 rounded-full text-green-600 animate-bounce">
+                <CheckCircle2 size={64} />
             </div>
         </div>
-
-        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">¡Pago Exitoso!</h1>
+        
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">¡Pedido Recibido!</h1>
         <p className="text-slate-500 mb-6">
-            Muchas gracias por tu compra. Tu pedido ha sido procesado correctamente.
+            Tu orden <span className="font-mono font-bold text-slate-800 text-xl">{displayId}</span> ha sido registrada.
         </p>
 
-        {/* Tarjeta de Orden */}
-        <div className="bg-slate-50 rounded-xl p-4 mb-8 border border-slate-100">
-            <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold mb-1">Número de Orden</p>
-            <p className="text-2xl font-mono font-bold text-slate-800 tracking-widest">
-                #{orderId || "..."}
-            </p>
+        {/* --- DATOS DE PAGO --- */}
+        <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl mb-8 text-left">
+            {isTransfer ? (
+                <>
+                    <div className="flex items-center gap-2 mb-4 text-blue-700 font-bold border-b border-slate-200 pb-2">
+                        <Wallet size={20} /> Datos para Transferir
+                    </div>
+                    <div className="space-y-3 text-sm text-slate-600 font-mono">
+                        <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-100">
+                            <span>Alias:</span>
+                            <div className="flex items-center gap-2">
+                                <strong className="text-slate-900">TECH.STORE.PAGO</strong>
+                                <button onClick={() => copyToClipboard("TECH.STORE.PAGO")}><Copy size={14} className="text-blue-500 hover:scale-110 transition"/></button>
+                            </div>
+                        </div>
+                        <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-100">
+                            <span>CBU:</span>
+                            <div className="flex items-center gap-2">
+                                <strong className="text-slate-900">000000310004488</strong>
+                                <button onClick={() => copyToClipboard("000000310004488")}><Copy size={14} className="text-blue-500 hover:scale-110 transition"/></button>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            ) : (
+                <>
+                    <div className="flex items-center gap-2 mb-4 text-slate-800 font-bold border-b border-slate-200 pb-2">
+                        <Store size={20} /> Retiro en Local
+                    </div>
+                    <div className="flex items-start gap-3">
+                        <MapPin className="text-red-500 mt-1 flex-shrink-0" />
+                        <div>
+                            <p className="font-bold text-slate-800 text-sm">Av. Siempre Viva 742</p>
+                            <p className="text-xs text-slate-500">Springfield, Buenos Aires</p>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
 
-        {/* Pasos a seguir */}
-        <div className="text-left space-y-3 mb-8 text-sm text-slate-600">
-            <div className="flex gap-3">
-                <span className="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">1</span>
-                <p>Recibirás un email de confirmación en breve.</p>
-            </div>
-            <div className="flex gap-3">
-                <span className="bg-blue-100 text-blue-700 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">2</span>
-                <p>Te notificaremos por WhatsApp cuando el pedido sea despachado.</p>
-            </div>
-        </div>
-
-        {/* Botones de Acción */}
         <div className="space-y-3">
-            <Link href="/" className="block">
-                <Button size="lg" className="w-full h-12 bg-slate-900 hover:bg-blue-600 font-bold shadow-lg transition-all">
-                    Seguir Comprando <ArrowRight className="ml-2" size={18} />
+            <a 
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full"
+            >
+                <Button className={`w-full font-bold py-6 text-lg shadow-lg transition-all ${isTransfer ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'}`}>
+                    <MessageCircle className="mr-2" /> 
+                    {isTransfer ? "Enviar Comprobante" : "Confirmar Retiro"}
+                </Button>
+            </a>
+            
+            <Link href="/" className="block w-full">
+                <Button variant="ghost" className="w-full text-slate-500 hover:text-slate-900">
+                    Volver a la Tienda
                 </Button>
             </Link>
-            
-            <Button variant="outline" className="w-full border-slate-200 text-slate-600 hover:bg-slate-50">
-                <Printer className="mr-2" size={16} /> Descargar Comprobante
-            </Button>
         </div>
-
       </div>
+
     </div>
   );
 }

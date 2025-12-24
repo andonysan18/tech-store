@@ -74,16 +74,16 @@ model User {
 
 // Direcciones guardadas en el perfil del usuario
 model Address {
-  id          Int     @id @default(autoincrement())
-  street      String
-  city        String
-  state       String
-  zipCode     String
-  country     String
-  isDefault   Boolean @default(false)
+  id            Int     @id @default(autoincrement())
+  street        String
+  city          String
+  state         String
+  zipCode       String
+  country       String
+  isDefault     Boolean @default(false)
   
-  userId      Int
-  user        User    @relation(fields: [userId], references: [id])
+  userId        Int
+  user          User    @relation(fields: [userId], references: [id])
 }
 
 // --- CATALOGO DE PRODUCTOS ---
@@ -115,7 +115,7 @@ model Category {
 model Product {
   id          Int      @id @default(autoincrement())
   name        String
-  slug        String   @unique             
+  slug        String   @unique              
   description String?
   
   // Especificaciones técnicas generales (JSON)
@@ -140,24 +140,24 @@ model Product {
 // La "Variante" física (Ej: "iPhone 13 - Azul - 128GB - Nuevo")
 // Aquí es donde manejamos el stock y precio real
 model ProductVariant {
-  id          Int              @id @default(autoincrement())
-  sku         String           @unique // Código único de inventario
-  price       Decimal          @db.Decimal(10, 2)
-  stock       Int              @default(0)
+  id           Int              @id @default(autoincrement())
+  sku          String           @unique // Código único de inventario
+  price        Decimal          @db.Decimal(10, 2)
+  stock        Int              @default(0)
   
   // Atributos específicos
-  color       String?          // Ej: "Midnight Blue"
-  storage     String?          // Ej: "128GB", "1TB"
-  condition   ProductCondition @default(NEW)
+  color        String?          // Ej: "Midnight Blue"
+  storage      String?          // Ej: "128GB", "1TB"
+  condition    ProductCondition @default(NEW)
   
   // Imágenes específicas de esta variante (ej: foto del celular azul)
-  images      String[]         
+  images       String[]         
 
-  productId   Int
-  product     Product          @relation(fields: [productId], references: [id])
+  productId    Int
+  product      Product          @relation(fields: [productId], references: [id])
   
-  orderItems  OrderItem[]
-  cartItems   CartItem[]
+  orderItems   OrderItem[]
+  cartItems    CartItem[]
 }
 
 // Sistema de Reseñas
@@ -177,11 +177,11 @@ model Review {
 // --- CARRITO DE COMPRAS (Opcional pero recomendado) ---
 
 model Cart {
-  id        Int        @id @default(autoincrement())
-  userId    Int        @unique
-  user      User       @relation(fields: [userId], references: [id])
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
   items     CartItem[]
-  updatedAt DateTime   @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 model CartItem {
@@ -197,21 +197,22 @@ model CartItem {
 // --- VENTAS Y PEDIDOS ---
 
 model Order {
-  id            Int         @id @default(autoincrement())
-  total         Decimal     @db.Decimal(10, 2)
-  status        OrderStatus @default(PENDIENTE_PAGO)
+  id              Int         @id @default(autoincrement())
+  total           Decimal     @db.Decimal(10, 2)
+  status          OrderStatus @default(PENDIENTE_PAGO)
   
-  userId        Int
-  user          User        @relation(fields: [userId], references: [id])
+  // 🔥🔥🔥 CAMBIO IMPORTANTE AQUÍ 🔥🔥🔥
+  // Agregamos '?' para permitir compras sin estar logueado (Invitados)
+  userId          Int?
+  user            User?       @relation(fields: [userId], references: [id])
   
-  items         OrderItem[]
+  items           OrderItem[]
   
   // Información de envío CONGELADA (Snapshot)
-  // No relacionamos a Address ID, copiamos los datos por si el usuario borra la dirección después
   shippingAddress Json      // { "street": "...", "city": "...", "zip": "..." }
   
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model OrderItem {
@@ -255,11 +256,11 @@ model RepairTicket {
 
 // Historial de la reparación (Trazabilidad)
 model RepairLog {
-  id              Int          @id @default(autoincrement())
-  ticketId        String
-  ticket          RepairTicket @relation(fields: [ticketId], references: [id])
+  id        Int          @id @default(autoincrement())
+  ticketId  String
+  ticket    RepairTicket @relation(fields: [ticketId], references: [id])
   
-  status          RepairStatus // El estado al que cambió
-  note            String?      // Ej: "Se pidió el repuesto a proveedor X"
-  createdAt       DateTime     @default(now())
+  status    RepairStatus // El estado al que cambió
+  note      String?      // Ej: "Se pidió el repuesto a proveedor X"
+  createdAt DateTime     @default(now())
 }
