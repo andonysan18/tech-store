@@ -1,6 +1,8 @@
 import { prisma } from "@/src/lib/db";
 import { DollarSign, ShoppingCart, Wrench, Users } from "lucide-react";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminDashboard() {
   // Consultas en paralelo para llenar las tarjetas
   const [ordersCount, repairsCount, productsCount, totalRevenue] = await Promise.all([
