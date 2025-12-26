@@ -1,29 +1,29 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { withAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
 
-export function middleware(request: NextRequest) {
-  // 👇 AGREGAMOS ESTO PARA ESPIAR EN LA TERMINAL
-  console.log("👮‍♂️ PATOVICA ACTIVO: Alguien intenta entrar a:", request.nextUrl.pathname);
+export default withAuth(
+  function middleware(req) {
+    // Lógica adicional si quieres loguear cosas
+    // console.log("👮‍♂️ Revisando acceso a:", req.nextUrl.pathname);
+  },
+  {
+    callbacks: {
+      authorized: ({ req, token }) => {
+        const path = req.nextUrl.pathname;
 
-  const path = request.nextUrl.pathname;
-  const isAdminRoute = path.startsWith('/admin');
-  const isPublicAdminRoute = path === '/admin/login';
+        // 🔥 LA SOLUCIÓN: Si intenta entrar al login, DÉJALO PASAR
+        if (path === "/admin/login") {
+          return true;
+        }
 
-  // Verificamos si es ruta admin protegida
-  if (isAdminRoute && !isPublicAdminRoute) {
-    const cookie = request.cookies.get('admin_session');
-    
-    console.log("🍪 Cookie encontrada:", cookie); // 👀 Vemos si hay cookie
-
-    if (!cookie) {
-      console.log("🚫 ACCESO DENEGADO. Redirigiendo al login...");
-      return NextResponse.redirect(new URL('/admin/login', request.url));
-    }
+        // Para cualquier otra ruta /admin, verifica si hay token
+        // También verificamos que sea ADMIN (opcional, pero recomendado)
+        return !!token && token.role === "ADMIN";
+      },
+    },
   }
-
-  return NextResponse.next();
-}
+);
 
 export const config = {
-  matcher: '/admin/:path*',
+  matcher: ["/admin/:path*"],
 };

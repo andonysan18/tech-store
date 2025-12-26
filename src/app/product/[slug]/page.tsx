@@ -1,70 +1,83 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/src/lib/db";
+import { prisma } from "@/src/lib/db"; 
 import { ProductGallery } from "@/src/components/products/product-gallery"; 
 import { Badge } from "@/src/components/ui/badge";
-import { 
-  ShieldCheck, Truck, ArrowLeft, Zap, Cpu, Layers, Smartphone, RefreshCw 
-} from "lucide-react";
+// 👇 Agregué MessageCircle aquí
+import { ShieldCheck, Truck, ArrowLeft, Zap, Layers, Cpu, Smartphone, RefreshCw, MessageCircle } from "lucide-react";
 import { AddToCart } from "@/src/components/products/add-to-cart";
 import { FavoriteButton } from "@/src/components/products/favorite-button";
+import { VariantSelector } from "@/src/components/products/variant-selector";
 
 interface ProductPageProps {
-  params: Promise<{
-    slug: string;
-  }>;
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ sku?: string }>;
 }
 
-export default async function ProductPage({ params }: ProductPageProps) {
+export default async function ProductPage({ params, searchParams }: ProductPageProps) {
   const { slug } = await params;
+  const { sku } = await searchParams;
 
-  // 1. Buscamos el producto Y sus variantes
+  // 1. Buscamos el producto
   const product = await prisma.product.findUnique({
     where: { slug: slug },
     include: { 
       category: true, 
       brand: true,
-      variants: true // <--- ¡CRÍTICO! Traemos las variantes
+      variants: {
+        orderBy: { price: 'asc' }
+      }
     },
   });
 
   if (!product) return notFound();
 
-  // 2. Lógica de "Variante por Defecto"
-  // En un e-commerce real, aquí podrías tener lógica para seleccionar por color si viene en la URL
-  // Por ahora, tomamos la primera variante disponible como la "principal".
-  const defaultVariant = product.variants[0];
-
-  // Si el producto existe pero no tiene variantes (error de carga de datos), manejamos fallback
-  if (!defaultVariant) {
-    return (
-       <div className="container mx-auto py-20 text-center">
-          <h1 className="text-2xl font-bold">Producto no disponible temporalmente</h1>
-          <p>No se encontraron variantes para este producto.</p>
-          <Link href="/" className="text-blue-600 underline">Volver al inicio</Link>
-       </div>
-    );
+  // 2. Lógica de Variante
+  let selectedVariant = product.variants.find(v => v.sku === sku);
+   
+  if (!selectedVariant) {
+      selectedVariant = product.variants[0];
   }
 
-  // 3. Extracción de datos para la UI
+  if (!selectedVariant) {
+    return <div className="p-10 text-center">Producto sin stock disponible.</div>;
+  }
+
+  // 3. Datos calculados
   const specs = (product.specs as Record<string, string>) || {};
-  
-  // Datos que ahora viven en la VARIANTE:
-  const priceNumber = Number(defaultVariant.price);
-  const stock = defaultVariant.stock;
-  const condition = defaultVariant.condition;
-  
-  // Las imágenes también viven en la variante ahora
-  const images = defaultVariant.images || [];
+  const priceNumber = Number(selectedVariant.price);
+   
+  const hasDiscount = product.discount > 0;
+  const originalPrice = hasDiscount 
+      ? priceNumber / (1 - (product.discount / 100)) 
+      : null;
+
+  const images = selectedVariant.images || [];
   const mainImage = images.length > 0 ? images[0] : "/placeholder.png";
+
+  const serializedVariants = product.variants.map(v => ({
+    id: v.id,
+    sku: v.sku,
+    color: v.color,
+    storage: v.storage,
+    price: Number(v.price),
+    stock: v.stock
+  }));
+
+  // 🔥 4. LÓGICA WHATSAPP (Nueva)
+  // ⚠️ IMPORTANTE: Cambia este número por el del negocio (sin el +)
+  const phoneNumber = "5491123456789"; 
+  
+  const messageText = `Hola! 👋 Estoy viendo el *${product.name}* (SKU: ${selectedVariant.sku}) por $${priceNumber.toLocaleString("es-AR")} y tengo una consulta.`;
+  const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(messageText)}`;
 
   return (
     <div className="bg-white min-h-screen pb-20">
-      
-      {/* NAVEGACIÓN SUPERIOR */}
+       
+      {/* NAVEGACIÓN */}
       <nav className="border-b border-gray-100 bg-white sticky top-0 z-20 backdrop-blur-md bg-white/80">
         <div className="container mx-auto px-4 h-14 flex items-center gap-2 text-sm">
-          <Link href="/" className="text-slate-500 hover:text-slate-900 transition flex items-center gap-1">
+          <Link href="/" className="text-slate-500 hover:text-slate-900 flex items-center gap-1">
              <ArrowLeft size={14} /> Tienda
           </Link>
           <span className="text-slate-300">/</span>
@@ -76,13 +89,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
-          {/* --- COLUMNA IZQUIERDA: FOTOS Y DESCRIPCIÓN --- */}
+           
+          {/* FOTOS */}
           <div className="lg:col-span-8 flex flex-col gap-12">
-            
-            {/* Galería de Imágenes */}
             <div className="bg-slate-50 rounded-2xl p-2 border border-slate-100">
-               {/* Usamos las imágenes de la variante */}
                {images.length > 0 ? (
                   <ProductGallery images={images} />
                ) : (
@@ -97,36 +107,26 @@ export default async function ProductPage({ params }: ProductPageProps) {
                <h3 className="text-2xl font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <Layers className="text-blue-600"/> Descripción
                </h3>
-               <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  {product.description || "Sin descripción disponible."}
+               <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed bg-white p-6 rounded-2xl border border-slate-100 shadow-sm whitespace-pre-wrap">
+                  {product.description}
                </div>
             </div>
 
-            {/* Ficha Técnica (Specs) */}
+            {/* Ficha Técnica */}
             {Object.keys(specs).length > 0 && (
              <div>
                  <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <Cpu className="text-purple-600"/> Ficha Técnica
                  </h3>
                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {/* Mostramos también datos clave de la variante seleccionada */}
-                    {defaultVariant.storage && (
-                       <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Almacenamiento</span>
-                          <span className="font-semibold text-slate-800">{defaultVariant.storage}</span>
-                       </div>
-                    )}
-                     {defaultVariant.color && (
-                       <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col gap-1">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Color</span>
-                          <span className="font-semibold text-slate-800">{defaultVariant.color}</span>
-                       </div>
-                    )}
-
+                    <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col gap-1">
+                       <span className="text-xs font-bold text-slate-400 uppercase">Modelo</span>
+                       <span className="font-semibold text-slate-800 truncate">{selectedVariant.sku}</span>
+                    </div>
                     {Object.entries(specs).map(([key, value]) => (
-                       <div key={key} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col gap-1 hover:border-blue-200 transition-colors">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{key}</span>
-                          <span className="font-semibold text-slate-800 break-words">{value}</span>
+                       <div key={key} className="bg-slate-50 p-5 rounded-2xl border border-slate-100 flex flex-col gap-1">
+                          <span className="text-xs font-bold text-slate-400 uppercase">{key}</span>
+                          <span className="font-semibold text-slate-800">{value}</span>
                        </div>
                     ))}
                  </div>
@@ -134,122 +134,106 @@ export default async function ProductPage({ params }: ProductPageProps) {
             )}
           </div>
 
-          {/* --- COLUMNA DERECHA: PRECIO Y COMPRA --- */}
+          {/* DERECHA: DATOS Y COMPRA */}
           <div className="lg:col-span-4">
              <div className="sticky top-20 flex flex-col gap-6">
                 
                 <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl shadow-slate-200/50">
                     
-                    {/* Header: Marca y Condición */}
                     <div className="flex justify-between items-start mb-4">
-                       <Badge variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200">
-                          {product.brand.name}
-                       </Badge>
-                       <Badge variant="outline" className={`${condition === 'NEW' ? 'text-green-600 border-green-200 bg-green-50' : 'text-orange-600 border-orange-200 bg-orange-50'}`}>
-                          {condition === 'NEW' ? 'Nuevo' : 'Reacondicionado'}
+                       <Badge variant="secondary">{product.brand.name}</Badge>
+                       <Badge variant="outline" className={selectedVariant.condition === 'NEW' ? 'text-green-600 bg-green-50' : 'text-orange-600 bg-orange-50'}>
+                          {selectedVariant.condition === 'NEW' ? 'Nuevo' : 'Reacondicionado'}
                        </Badge>
                     </div>
 
                     <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight mb-2">
                        {product.name}
-                       {/* Mostramos detalles de la variante en el título para claridad */}
-                       {defaultVariant.storage && <span className="text-slate-400 font-normal ml-2 text-lg">{defaultVariant.storage}</span>}
                     </h1>
                     
-                    {defaultVariant.color && (
-                      <p className="text-slate-500 text-sm font-medium mb-4">Color: {defaultVariant.color}</p>
-                    )}
-
-                    {/* Precios */}
+                    {/* PRECIOS DINÁMICOS */}
                     <div className="mt-4 mb-6">
-                       <p className="text-sm text-slate-400 line-through mb-1">
-                          ${(priceNumber * 1.15).toLocaleString("es-AR")}
-                       </p>
-                       <div className="flex items-center gap-2">
-                          <span className="text-4xl font-extrabold text-slate-900">
-                             ${priceNumber.toLocaleString("es-AR")}
-                          </span>
-                          <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">
-                            -15% OFF
-                          </span>
-                       </div>
+                       {hasDiscount && originalPrice && (
+                           <div className="flex items-center gap-2 mb-1">
+                               <p className="text-sm text-slate-400 line-through">
+                                 ${originalPrice.toLocaleString("es-AR", { maximumFractionDigits: 0 })}
+                               </p>
+                               <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-0">
+                                 {product.discount}% OFF
+                               </Badge>
+                           </div>
+                       )}
+                       <span className="text-4xl font-extrabold text-slate-900">
+                          ${priceNumber.toLocaleString("es-AR")}
+                       </span>
                     </div>
 
-                    {/* Stock */}
+                    <VariantSelector variants={serializedVariants} />
+
+                    {/* STOCK */}
                     <div className="flex items-center gap-2 mb-6 text-sm">
-                       {stock > 0 ? (
+                       {selectedVariant.stock > 0 ? (
                           <>
                              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                             <span className="text-green-700 font-medium">Stock disponible hoy</span>
+                             <span className="text-green-700 font-medium">
+                                Stock disponible ({selectedVariant.stock} un.)
+                             </span>
                           </>
                        ) : (
                           <>
                              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                             <span className="text-red-700 font-medium">Agotado temporalmente</span>
+                             <span className="text-red-700 font-medium">Sin stock por el momento</span>
                           </>
                        )}
                     </div>
 
-                    {/* Botones de Acción */}
                     <div className="flex flex-col gap-3">
-                       
-                       {/* 1. Agregar al Carrito */}
-                       {/* IMPORTANTE: Pasamos el ID de la VARIANTE, no del producto */}
                        <AddToCart 
                          product={{
-                             id: defaultVariant.id, // <--- ID de Variante para el Schema V2
-                             name: `${product.name} ${defaultVariant.storage || ''}`,
+                             id: selectedVariant.id,
+                             name: `${product.name} ${selectedVariant.color || ''}`,
                              price: priceNumber, 
                              image: mainImage,
-                             stock: stock
+                             stock: selectedVariant.stock
                          }}
                        />
-                       
-                       {/* 2. Favoritos */}
                        <FavoriteButton 
                          product={{
-                             id: product.id, // Favoritos suele ser al producto general, no a la variante
+                             id: product.id,
                              name: product.name,
                              price: priceNumber, 
                              image: mainImage,
-                             stock: stock,
-                             condition: condition,
+                             stock: selectedVariant.stock,
+                             condition: selectedVariant.condition,
                              category: product.category.name,
                              brand: { name: product.brand.name }
                          }}
                        />
+
+                       {/* 🔥 BOTÓN WHATSAPP NUEVO 🔥 */}
+                       <a 
+                         href={whatsappUrl}
+                         target="_blank"
+                         rel="noopener noreferrer"
+                         className="flex items-center justify-center gap-2 w-full py-3 px-4 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-xl font-medium transition-all shadow-md hover:shadow-lg active:scale-95 mt-2"
+                       >
+                         <MessageCircle size={20} className="fill-current" />
+                         Consultar con un experto
+                       </a>
+
                     </div>
 
-                    {/* Iconos de confianza */}
+                    {/* Iconos estáticos */}
                     <div className="mt-6 grid grid-cols-2 gap-2 text-xs text-slate-500">
                        <div className="flex flex-col items-center p-2 bg-slate-50 rounded-lg text-center">
                           <Truck className="mb-1 text-slate-900" size={18}/> 
-                          <span>Envío Gratis</span>
+                          <span>Envío a todo el país</span>
                        </div>
                        <div className="flex flex-col items-center p-2 bg-slate-50 rounded-lg text-center">
                           <ShieldCheck className="mb-1 text-slate-900" size={18}/> 
-                          <span>Garantía 12m</span>
-                       </div>
-                       <div className="flex flex-col items-center p-2 bg-slate-50 rounded-lg text-center">
-                          <RefreshCw className="mb-1 text-slate-900" size={18}/> 
-                          <span>Devolución</span>
-                       </div>
-                       <div className="flex flex-col items-center p-2 bg-slate-50 rounded-lg text-center">
-                          <Zap className="mb-1 text-slate-900" size={18}/> 
-                          <span>Entrega Fast</span>
+                          <span>Garantía Oficial</span>
                        </div>
                     </div>
-                </div>
-
-                {/* Banner de ayuda */}
-                <div className="bg-slate-900 text-white p-5 rounded-2xl flex items-center gap-4">
-                   <div className="bg-white/10 p-3 rounded-full">
-                      <Smartphone size={24} />
-                   </div>
-                   <div>
-                      <p className="font-bold text-sm">¿Dudas con el equipo?</p>
-                      <p className="text-xs text-slate-300">Habla con un experto tech.</p>
-                   </div>
                 </div>
 
              </div>

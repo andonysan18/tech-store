@@ -1,14 +1,15 @@
 // Archivo: prisma/seed.ts
 
 import { PrismaClient, Role, ProductCondition, OrderStatus, RepairStatus } from '@prisma/client'
+import bcrypt from 'bcryptjs' // Asegúrate de tener instalado bcryptjs
 
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🌱 Iniciando el seed de la base de datos (Versión Ofertas)...')
+  console.log('🌱 Iniciando el seed de la base de datos...')
 
   // ----------------------------------------------------------------------
-  // 1. LIMPIEZA DE BASE DE DATOS
+  // 1. LIMPIEZA DE BASE DE DATOS (Orden Importante)
   // ----------------------------------------------------------------------
   await prisma.repairLog.deleteMany()
   await prisma.repairTicket.deleteMany()
@@ -29,24 +30,29 @@ async function main() {
   console.log('🗑️ Base de datos limpiada.')
 
   // ----------------------------------------------------------------------
-  // 2. CREAR USUARIOS
+  // 2. CREAR USUARIOS (ADMIN PRINCIPAL)
   // ----------------------------------------------------------------------
-  const passwordHash = "$2b$10$e.g./dJz0jXkP.1.A/e.g.u.s.e.r.p.a.s.s.w.o.r.d" 
+  
+  // 🔥 Contraseña común para todos
+  const passwordRaw = "admin123";
+  const passwordHash = await bcrypt.hash(passwordRaw, 10);
 
+  // ADMIN PRINCIPAL
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@techrepair.com',
-      name: 'Administrador Principal',
-      password: passwordHash, 
+      email: 'admin@techstore.com', // 👈 ESTE ES TU USUARIO ADMIN
+      name: 'Super Admin',
+      password: passwordHash,       // 👈 LA CONTRASEÑA ES "admin123"
       role: Role.ADMIN,
     },
   })
 
+  // CLIENTE DE PRUEBA
   const client = await prisma.user.create({
     data: {
       email: 'cliente@gmail.com',
       name: 'Juan Pérez',
-      password: passwordHash,
+      password: passwordHash,       // También usa "admin123"
       role: Role.CLIENT,
       phone: '11-5555-6666',
       addresses: {
@@ -63,9 +69,12 @@ async function main() {
     include: { addresses: true }
   })
 
+  console.log('👤 Usuarios creados.')
+
   // ----------------------------------------------------------------------
   // 3. MARCAS Y CATEGORÍAS
   // ----------------------------------------------------------------------
+  // Nota: Agregamos /png a las marcas también por seguridad
   const apple = await prisma.brand.create({ data: { name: 'Apple', slug: 'apple', imageUrl: 'https://placehold.co/100x100/png?text=Apple' } })
   const samsung = await prisma.brand.create({ data: { name: 'Samsung', slug: 'samsung', imageUrl: 'https://placehold.co/100x100/png?text=Samsung' } })
   const sony = await prisma.brand.create({ data: { name: 'Sony', slug: 'sony', imageUrl: 'https://placehold.co/100x100/png?text=Sony' } })
@@ -85,7 +94,7 @@ async function main() {
   const catComponentes = await prisma.category.create({ data: { name: 'Componentes PC', slug: 'componentes-pc' } })
 
   // ----------------------------------------------------------------------
-  // 4. PRODUCTOS (Ahora con descuentos reales)
+  // 4. PRODUCTOS (Con arreglo de imágenes)
   // ----------------------------------------------------------------------
   
   const productsData = [
@@ -97,7 +106,7 @@ async function main() {
       brandId: apple.id,
       categoryId: catCelulares.id,
       isFeatured: true,
-      discount: 5, // 🔥 5% OFF (Agregado)
+      discount: 5,
       specs: { screen: '6.7 OLED', camera: '48MP', cpu: 'A16' },
       variants: [
         { sku: 'IP14PM-PUR-256', price: 1200, stock: 10, color: 'Deep Purple', storage: '256GB', condition: ProductCondition.NEW },
@@ -111,7 +120,6 @@ async function main() {
       brandId: samsung.id,
       categoryId: catCelulares.id,
       isFeatured: true,
-      // Sin descuento este
       specs: { screen: '6.8 AMOLED', camera: '200MP', cpu: 'Snapdragon 8 Gen 2' },
       variants: [
         { sku: 'S23U-GRN-512', price: 1150, stock: 8, color: 'Green', storage: '512GB', condition: ProductCondition.NEW },
@@ -125,7 +133,7 @@ async function main() {
       brandId: apple.id,
       categoryId: catCelulares.id,
       isFeatured: false,
-      discount: 25, // 🔥 Aumenté a 25% OFF
+      discount: 25,
       specs: { screen: '6.1 LCD', camera: '12MP' },
       variants: [
         { sku: 'IP11-RED-64-REF', price: 350, stock: 4, color: 'Product Red', storage: '64GB', condition: ProductCondition.REFURBISHED },
@@ -139,7 +147,7 @@ async function main() {
       brandId: samsung.id,
       categoryId: catCelulares.id,
       isFeatured: false,
-      discount: 10, // 🔥 10% OFF (Agregado)
+      discount: 10,
       specs: { screen: '6.4 Super AMOLED', camera: '50MP' },
       variants: [
         { sku: 'SAM-A54-LIME', price: 450, stock: 20, color: 'Awesome Lime', storage: '128GB', condition: ProductCondition.NEW }
@@ -181,7 +189,7 @@ async function main() {
       brandId: sony.id,
       categoryId: catConsolas.id,
       isFeatured: true,
-      discount: 15, // 🔥 15% OFF (Este faltaba y era clave)
+      discount: 15,
       specs: { resolution: '4K', fps: '120Hz' },
       variants: [
         { sku: 'SONY-PS5-STD', price: 799, stock: 15, color: 'White', condition: ProductCondition.NEW }
@@ -194,7 +202,6 @@ async function main() {
       brandId: nintendo.id,
       categoryId: catConsolas.id,
       isFeatured: true,
-      // Sin descuento
       specs: { screen: '7 OLED', mode: 'Handheld/TV' },
       variants: [
         { sku: 'NSW-OLED-WHT', price: 349, stock: 25, color: 'White Joy-Con', storage: '64GB', condition: ProductCondition.NEW },
@@ -210,7 +217,7 @@ async function main() {
       brandId: sony.id,
       categoryId: catAudio.id,
       isFeatured: true,
-      discount: 20, // 🔥 20% OFF (Gran oferta)
+      discount: 20,
       specs: { type: 'Over-Ear', battery: '30h' },
       variants: [
         { sku: 'SONY-XM5-BLK', price: 399, stock: 10, color: 'Black', condition: ProductCondition.NEW },
@@ -238,7 +245,7 @@ async function main() {
       brandId: logitech.id,
       categoryId: catPerifericos.id,
       isFeatured: true,
-      discount: 10, // 🔥 10% OFF
+      discount: 10,
       specs: { dpi: '8000', connectivity: 'Bluetooth/Bolt' },
       variants: [
         { sku: 'LOG-MX3S-GRPH', price: 99, stock: 20, color: 'Graphite', condition: ProductCondition.NEW }
@@ -278,7 +285,7 @@ async function main() {
       brandId: asus.id,
       categoryId: catComponentes.id,
       isFeatured: true,
-      discount: 5, // 🔥 5% OFF
+      discount: 5,
       specs: { vram: '8GB GDDR6', dlss: '3.0' },
       variants: [
         { sku: 'ASUS-4060-DUAL', price: 320, stock: 4, condition: ProductCondition.NEW }
@@ -296,7 +303,8 @@ async function main() {
         variants: {
           create: variants.map(v => ({
             ...v,
-            images: [`https://placehold.co/600x400?text=${productInfo.name.replace(/ /g, '+')}`]
+            // 🔥 SOLUCIÓN DE IMÁGENES: Agregamos /png para evitar error SVG
+            images: [`https://placehold.co/600x400/png?text=${productInfo.name.replace(/ /g, '+')}`]
           }))
         }
       }
@@ -358,8 +366,14 @@ async function main() {
       }
     }
   })
+  
   console.log(`🔧 Ticket creado: ${ticket.trackingCode}`)
-  console.log('✅ Seed finalizado.')
+  console.log('------------------------------------------------')
+  console.log('✅ Seed finalizado con éxito.')
+  console.log('🔑 CREDENCIALES ADMIN:')
+  console.log('   Email:    admin@techstore.com')
+  console.log('   Pass:     admin123')
+  console.log('------------------------------------------------')
 }
 
 main()

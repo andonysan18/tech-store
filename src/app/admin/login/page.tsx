@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, User, Loader2, ShieldCheck } from "lucide-react"; // 👈 Agregamos icono User
+import { signIn } from "next-auth/react"; // 👈 IMPORTANTE: Usamos la función de NextAuth
+import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react"; // Cambié User por Mail
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
+import { toast } from "sonner"; // Opcional: para alertas bonitas
 
 export default function AdminLoginPage() {
-  const [username, setUsername] = useState(""); // 👈 Nuevo estado
+  const [email, setEmail] = useState(""); // 👈 Usamos email, no username
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,25 +20,21 @@ export default function AdminLoginPage() {
     setError("");
     setIsLoading(true);
 
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }), // 👈 Enviamos ambos
-      });
+    // 🔥 AQUÍ ESTÁ LA MAGIA DE NEXTAUTH
+    // No usamos fetch manual, usamos signIn
+    const result = await signIn("credentials", {
+      redirect: false, // No redirigir automático para poder manejar errores
+      email: email,
+      password: password,
+    });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Error de autenticación");
-      }
-
-      router.push("/admin/");
-      router.refresh();
-      
-    } catch (err) {
-      setError("Usuario o contraseña incorrectos.");
+    if (result?.error) {
+      setError("Credenciales inválidas. Verifica email y contraseña.");
       setIsLoading(false);
+    } else {
+      // Si todo salió bien, NextAuth ya creó la cookie de sesión
+      router.push("/admin"); // Redirigimos al Dashboard
+      router.refresh(); // Refrescamos para que el middleware detecte la nueva cookie
     }
   };
 
@@ -57,17 +55,17 @@ export default function AdminLoginPage() {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* 👇 NUEVO INPUT DE USUARIO */}
+            {/* 👇 INPUT DE EMAIL */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                <User size={16} /> Usuario
+                <Mail size={16} /> Email Corporativo
               </label>
               <Input
-                type="text"
-                placeholder="admin"
+                type="email"
+                placeholder="admin@techstore.com"
                 className="h-12 text-lg"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 autoFocus
               />
             </div>
@@ -93,7 +91,7 @@ export default function AdminLoginPage() {
 
             <Button 
               type="submit" 
-              disabled={isLoading || !password || !username}
+              disabled={isLoading || !password || !email}
               className="w-full h-12 text-md font-bold bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? (
@@ -101,7 +99,7 @@ export default function AdminLoginPage() {
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...
                 </>
               ) : (
-                "Ingresar"
+                "Ingresar al Panel"
               )}
             </Button>
           </form>

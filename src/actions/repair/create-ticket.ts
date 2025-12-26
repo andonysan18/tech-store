@@ -32,7 +32,7 @@ export async function createRepairTicket(data: {
         
         // 🔥 CAMBIO AGREGADO: Guardamos el email en las notas internas
         // Si hay email, lo guardamos. Si no, queda null.
-        internalNotes: data.email ? `Email de contacto: ${data.email}` : null,
+        internalNotes: data.email ? `${data.email}` : null,
 
         status: "PENDIENTE",
         logs: {
