@@ -2,12 +2,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/src/lib/db"; 
 import { ProductCard } from "@/src/components/products/product-card"; 
-import { ArrowRight, Wrench, Gamepad2, Zap } from "lucide-react";
+import { ArrowRight, Wrench, Gamepad2 } from "lucide-react";
 
 // Importamos los nuevos componentes visuales
 import { BenefitsBar } from "@/src/components/home/benefits-bar";
 import { BentoGridCategories } from "@/src/components/home/bento-grid";
 import { LifestyleSection } from "@/src/components/home/lifestyle-section";
+
+// 👇 ESTA LÍNEA SOLUCIONA TU PROBLEMA DE VERCEL
+// Obliga a que la página se renderice de nuevo en cada visita (Server Side Rendering real).
+export const dynamic = "force-dynamic";
 
 export default async function Home() {
   // 🔥 CONSULTAS PARALELAS
