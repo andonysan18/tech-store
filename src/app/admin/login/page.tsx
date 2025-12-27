@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react"; // 👈 IMPORTANTE: Usamos la función de NextAuth
-import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react"; // Cambié User por Mail
+import { signIn } from "next-auth/react";
+import { Lock, Mail, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
-import { toast } from "sonner"; // Opcional: para alertas bonitas
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState(""); // 👈 Usamos email, no username
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -20,21 +19,26 @@ export default function AdminLoginPage() {
     setError("");
     setIsLoading(true);
 
-    // 🔥 AQUÍ ESTÁ LA MAGIA DE NEXTAUTH
-    // No usamos fetch manual, usamos signIn
-    const result = await signIn("credentials", {
-      redirect: false, // No redirigir automático para poder manejar errores
-      email: email,
-      password: password,
-    });
+    try {
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: email,
+        password: password,
+      });
 
-    if (result?.error) {
-      setError("Credenciales inválidas. Verifica email y contraseña.");
+      if (result?.error) {
+        setError("Credenciales inválidas. Verifica email y contraseña.");
+        setIsLoading(false);
+      } else if (result?.ok) {
+        router.push("/admin");
+        router.refresh();
+      } else {
+        setError("Error de conexión con el servidor.");
+        setIsLoading(false);
+      }
+    } catch (err) {
+      setError("Ocurrió un error inesperado.");
       setIsLoading(false);
-    } else {
-      // Si todo salió bien, NextAuth ya creó la cookie de sesión
-      router.push("/admin"); // Redirigimos al Dashboard
-      router.refresh(); // Refrescamos para que el middleware detecte la nueva cookie
     }
   };
 
@@ -55,7 +59,6 @@ export default function AdminLoginPage() {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* 👇 INPUT DE EMAIL */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
                 <Mail size={16} /> Email Corporativo
